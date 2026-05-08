@@ -1,0 +1,28 @@
+{
+  "name": "@swipehire/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "dotenv -e ../.env -- prisma generate",
+    "db:migrate": "dotenv -e ../.env -- prisma migrate dev",
+    "db:reset": "dotenv -e ../.env -- prisma migrate reset",
+    "db:studio": "dotenv -e ../.env -- prisma studio",
+    "db:seed": "dotenv -e ../.env -- tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "dotenv-cli": "^11.0.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.8.0"
+  }
+}

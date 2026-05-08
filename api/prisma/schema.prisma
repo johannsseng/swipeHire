@@ -1,0 +1,203 @@
+// SwipeHire Prisma schema
+// Source of truth: docs/schema.md
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum VerifiedTier {
+  unverified
+  partial
+  verified
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum JobSource {
+  greenhouse
+  lever
+  manual
+}
+
+enum ApplyMethod {
+  deeplink
+  greenhouse_post
+  lever_post
+}
+
+enum SwipeDirection {
+  left
+  right
+}
+
+enum ApplicationStatus {
+  queued
+  submitted
+  deeplinked
+  failed
+}
+
+enum EmploymentType {
+  full_time
+  contract
+  intern
+}
+
+enum VerificationSignalType {
+  linkedin_oauth
+  github_oauth
+  phone
+  edu_email
+  resume_coherence
+}
+
+// ─── Models ─────────────────────────────────────────────────────────────────
+
+model User {
+  id            String       @id @default(uuid()) @db.Uuid
+  email         String       @unique
+  passwordHash  String       @map("password_hash")
+  emailVerified Boolean      @default(false) @map("email_verified")
+  verifiedTier  VerifiedTier @default(unverified) @map("verified_tier")
+  role          UserRole     @default(user)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  profile       Profile?
+  swipes        Swipe[]
+  applications  Application[]
+  verifications Verification[]
+
+  @@map("users")
+}
+
+model Profile {
+  userId       String   @id @map("user_id") @db.Uuid
+  fullName     String?  @map("full_name")
+  headline     String?
+  bio          String?  @db.Text
+  location     String?
+  links        Json?    @db.JsonB
+  resumeUrl    String?  @map("resume_url")
+  resumeParsed Json?    @map("resume_parsed") @db.JsonB
+  preferences  Json?    @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Company {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  source       JobSource
+  boardToken   String    @map("board_token")
+  website      String?
+  logoUrl      String?   @map("logo_url")
+  active       Boolean   @default(true)
+  lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz
+  syncError    String?   @map("sync_error") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  jobs         Job[]
+
+  @@unique([source, boardToken])
+  @@index([active, lastSyncedAt])
+  @@map("companies")
+}
+
+model Job {
+  id              String          @id @default(uuid()) @db.Uuid
+  companyId       String          @map("company_id") @db.Uuid
+  source          JobSource
+  sourceId        String          @map("source_id")
+  title           String
+  location        String?
+  remote          Boolean         @default(false)
+  employmentType  EmploymentType? @map("employment_type")
+  descriptionHtml String?         @map("description_html") @db.Text
+  descriptionText String?         @map("description_text") @db.Text
+  applyUrl        String          @map("apply_url")
+  applyMethod     ApplyMethod     @map("apply_method")
+  postedAt        DateTime?       @map("posted_at") @db.Timestamptz
+  active          Boolean         @default(true)
+  raw             Json            @db.JsonB
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  company         Company         @relation(fields: [companyId], references: [id])
+  swipes          Swipe[]
+  applications    Application[]
+
+  @@unique([source, sourceId])
+  @@index([active, postedAt(sort: Desc)])
+  @@index([companyId])
+  @@map("jobs")
+}
+
+model Swipe {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  jobId     String         @map("job_id") @db.Uuid
+  direction SwipeDirection
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId, direction, createdAt(sort: Desc)])
+  @@map("swipes")
+}
+
+model Application {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  jobId       String            @map("job_id") @db.Uuid
+  status      ApplicationStatus
+  applyMethod ApplyMethod?      @map("apply_method")
+  resumeUrl   String?           @map("resume_url")
+  coverLetter String?           @map("cover_letter") @db.Text
+  answers     Json?             @db.JsonB
+  submittedAt DateTime?         @map("submitted_at") @db.Timestamptz
+  response    Json?             @db.JsonB
+  error       String?           @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job         Job               @relation(fields: [jobId], references: [id])
+
+  @@unique([userId, jobId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("applications")
+}
+
+model Verification {
+  id          String                 @id @default(uuid()) @db.Uuid
+  userId      String                 @map("user_id") @db.Uuid
+  signalType  VerificationSignalType @map("signal_type")
+  signalValue Json                   @map("signal_value") @db.JsonB
+  verifiedAt  DateTime               @default(now()) @map("verified_at") @db.Timestamptz
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, signalType])
+  @@map("verifications")
+}
