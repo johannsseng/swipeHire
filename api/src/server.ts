@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { authRouter } from "./auth/routes.js";
 import { usersRouter } from "./users/routes.js";
+import { jobsRouter } from "./jobs/routes.js";
 
 export function createServer(): Express {
   const app = express();
@@ -16,6 +17,7 @@ export function createServer(): Express {
   });
 
   app.use("/auth", authRouter);
+  app.use("/jobs", jobsRouter);
   app.use(usersRouter); // mounted at root so routes are /me, /me/profile
 
   return app;
