@@ -63,6 +63,28 @@ enum VerificationSignalType {
   resume_coherence
 }
 
+enum ReviewSource {
+  in_app
+  glassdoor
+}
+
+enum OutreachStatus {
+  draft
+  queued
+  sent
+  failed
+}
+
+// Pipeline stage for a saved job (lives on the right-swipe record).
+enum TrackStatus {
+  saved
+  applied
+  screening
+  interview
+  accepted
+  rejected
+}
+
 // ─── Models ─────────────────────────────────────────────────────────────────
 
 model User {
@@ -79,6 +101,8 @@ model User {
   swipes        Swipe[]
   applications  Application[]
   verifications Verification[]
+  reviews       Review[]
+  outreaches    Outreach[]
 
   @@map("users")
 }
@@ -111,10 +135,22 @@ model Company {
   active       Boolean   @default(true)
   lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz
   syncError    String?   @map("sync_error") @db.Text
+
+  // Recruiter contact (used by the outreach feature)
+  recruiterName  String? @map("recruiter_name")
+  recruiterEmail String? @map("recruiter_email")
+  recruiterTitle String? @map("recruiter_title")
+  // When we last attempted Hunter auto-enrichment (avoids re-querying misses).
+  recruiterEnrichedAt DateTime? @map("recruiter_enriched_at") @db.Timestamptz
+
+  // External reviews reference (e.g. Glassdoor employer id)
+  glassdoorId  String?   @map("glassdoor_id")
+
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   jobs         Job[]
+  reviews      Review[]
 
   @@unique([source, boardToken])
   @@index([active, lastSyncedAt])
@@ -143,6 +179,7 @@ model Job {
   company         Company         @relation(fields: [companyId], references: [id])
   swipes          Swipe[]
   applications    Application[]
+  outreaches      Outreach[]
 
   @@unique([source, sourceId])
   @@index([active, postedAt(sort: Desc)])
@@ -155,6 +192,11 @@ model Swipe {
   userId    String         @map("user_id") @db.Uuid
   jobId     String         @map("job_id") @db.Uuid
   direction SwipeDirection
+
+  // Application pipeline tracking for saved (right-swiped) jobs.
+  trackStatus    TrackStatus @default(saved) @map("track_status")
+  trackUpdatedAt DateTime?   @map("track_updated_at") @db.Timestamptz
+
   createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -201,4 +243,50 @@ model Verification {
 
   @@index([userId, signalType])
   @@map("verifications")
+}
+
+model Review {
+  id          String       @id @default(uuid()) @db.Uuid
+  companyId   String       @map("company_id") @db.Uuid
+  userId      String?      @map("user_id") @db.Uuid // null for externally-sourced reviews
+  source      ReviewSource @default(in_app)
+  rating      Int          // 1–5
+  title       String?
+  body        String?      @db.Text
+  pros        String?      @db.Text
+  cons        String?      @db.Text
+  authorTitle String?      @map("author_title") // e.g. "Software Engineer"
+  externalId  String?      @map("external_id") // provider-side id, for de-duping
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, companyId]) // one in-app review per user per company
+  @@unique([source, externalId])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+model Outreach {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  jobId          String         @map("job_id") @db.Uuid
+  recruiterEmail String         @map("recruiter_email")
+  subject        String
+  body           String         @db.Text
+  status         OutreachStatus @default(draft)
+  providerId     String?        @map("provider_id") // id returned by the email provider
+  sentAt         DateTime?      @map("sent_at") @db.Timestamptz
+  error          String?        @db.Text
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job            Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([jobId])
+  @@map("outreaches")
 }

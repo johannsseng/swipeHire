@@ -1,0 +1,76 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploys SwipeHire on the FREE tier:
+#   • swipehire-api — the Express API (free web service; sleeps after ~15 min
+#     idle, first request after that takes ~30–60s to wake)
+#
+# Data syncs (jobs, reviews, domains) are run manually from a laptop:
+#   pnpm sync · pnpm sync:reviews · pnpm enrich:domains   (in worker/)
+#
+# Schema changes: free instances don't run pre-deploy commands, so after
+# changing schema.prisma run `pnpm db:push` locally before deploying.
+#
+# Secrets marked `sync: false` are entered once in the Render dashboard
+# (Environment → swipehire group).
+
+envVarGroups:
+  - name: swipehire
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL # Neon connection string (postgresql://...sslmode=require)
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS # optional — e.g. https://app.swipehire.com
+        sync: false
+      - key: RESEND_API_KEY # optional — enables outreach sending
+        sync: false
+      - key: OUTREACH_FROM_EMAIL
+        sync: false
+      - key: HUNTER_API_KEY # optional — recruiter auto-find
+        sync: false
+      - key: RAPIDAPI_KEY # optional — Glassdoor reviews via RapidAPI
+        sync: false
+
+services:
+  - type: web
+    name: swipehire-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @swipehire/api prisma:generate
+    startCommand: pnpm --filter @swipehire/api start:prod
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: swipehire
+
+# ── Upgrade path (uncomment + set plan when moving to paid) ──────────────────
+# Paid instances also support:  preDeployCommand: pnpm --filter @swipehire/api db:push:prod
+#
+#  - type: cron
+#    name: swipehire-sync-jobs
+#    runtime: node
+#    plan: starter
+#    region: oregon
+#    branch: main
+#    schedule: "0 6 * * *" # daily, 06:00 UTC
+#    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @swipehire/api prisma:generate
+#    startCommand: pnpm --filter @swipehire/worker sync:prod && pnpm --filter @swipehire/worker domains:prod
+#    envVars:
+#      - fromGroup: swipehire
+#
+#  - type: cron
+#    name: swipehire-sync-reviews
+#    runtime: node
+#    plan: starter
+#    region: oregon
+#    branch: main
+#    schedule: "0 4 * * 1" # weekly, Monday 04:00 UTC
+#    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @swipehire/api prisma:generate
+#    startCommand: pnpm --filter @swipehire/worker reviews:prod
+#    envVars:
+#      - fromGroup: swipehire

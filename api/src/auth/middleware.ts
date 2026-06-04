@@ -10,6 +10,9 @@ declare global {
   }
 }
 
+// Convenience alias for handlers behind requireAuth, where `userId` is set.
+export type AuthedRequest = Request;
+
 export function requireAuth(
   req: Request,
   res: Response,

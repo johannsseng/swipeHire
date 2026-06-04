@@ -6,6 +6,13 @@
   "scripts": {
     "dev": "tsx watch --env-file=../.env src/index.ts",
     "sync": "tsx --env-file=../.env src/sync.ts",
+    "sync:reviews": "tsx --env-file=../.env src/reviews.ts",
+    "sync:jsearch": "tsx --env-file=../.env src/jsearch.ts",
+    "enrich:domains": "tsx --env-file=../.env src/domains.ts",
+    "sync:prod": "tsx src/sync.ts",
+    "reviews:prod": "tsx src/reviews.ts",
+    "jsearch:prod": "tsx src/jsearch.ts",
+    "domains:prod": "tsx src/domains.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
