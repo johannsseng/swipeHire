@@ -14,13 +14,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://swipehire-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://swipehire-api-vhsg.onrender.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://swipehire-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://swipehire-api-vhsg.onrender.com"
       }
     }
   },

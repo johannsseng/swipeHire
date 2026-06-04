@@ -42,7 +42,9 @@ services:
     plan: free
     region: oregon
     branch: main
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @swipehire/api prisma:generate
+    # --prod=false: NODE_ENV=production makes pnpm skip devDependencies, but the
+    # build needs the prisma CLI and runtime needs tsx (both devDeps).
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @swipehire/api prisma:generate
     startCommand: pnpm --filter @swipehire/api start:prod
     healthCheckPath: /health
     envVars:
