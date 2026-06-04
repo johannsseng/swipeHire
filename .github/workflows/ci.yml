@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The Prisma client is gitignored, so generate it before typechecking.
+      - name: Generate Prisma client
+        run: pnpm --filter @swipehire/api prisma:generate
+
+      # Mobile is fully type-clean and gates the build.
+      - name: Typecheck (mobile)
+        run: pnpm --filter @swipehire/mobile typecheck
+
+      # Pure-logic unit tests (salary, HTML cleanup, inbox, draft).
+      - name: Unit tests (api)
+        run: pnpm --filter @swipehire/api test
+
+      # The API/worker run via tsx (transpile-only) and carry some known strict
+      # tsc findings (Express 5 param typing, jwt overloads). Surfaced here as
+      # non-blocking until those are addressed — see DEPLOYMENT_CHECKLIST.md.
+      - name: Typecheck (api + worker, informational)
+        continue-on-error: true
+        run: |
+          pnpm --filter @swipehire/api typecheck
+          pnpm --filter @swipehire/worker typecheck
