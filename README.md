@@ -12,6 +12,26 @@ Swipe-to-apply job discovery. A pnpm monorepo:
 Database is **Postgres on Neon**. Reviews come from in-app users plus an optional
 Glassdoor feed (RapidAPI). Recruiter outreach routes to a company careers inbox.
 
+The API is deployed at **https://swipehire-api-vhsg.onrender.com**.
+
+## Run the app against the live backend (teammates start here)
+
+You do **not** need the database, API, or any API keys — the backend is already
+deployed. Just run the mobile app and point it at production:
+
+```bash
+git clone https://github.com/2601-capstone-jobboard/swipeHire.git
+cd swipeHire
+pnpm install
+cd mobile
+cp .env.local.example .env.local      # already points at the live API
+pnpm start                            # press i for iOS sim, a for Android, or scan the QR in Expo Go
+```
+
+Create an account in the app and start swiping — it's talking to the same
+production database. (First request may take ~30–60s while the free instance
+wakes up.) To run the full backend locally instead, see *Local setup* below.
+
 ## Prerequisites
 
 - Node ≥ 20, `pnpm` (`corepack enable`)
