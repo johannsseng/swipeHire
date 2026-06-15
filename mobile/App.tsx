@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import {
   api,
@@ -25,7 +25,7 @@ import { DiscoverScreen } from "./screens/DiscoverScreen";
 import { SavedScreen } from "./screens/SavedScreen";
 import { AdminScreen } from "./screens/AdminScreen";
 import { SettingsModal } from "./components/SettingsModal";
-import { colors, space, radius, font } from "./theme";
+import { ThemeProvider, useTheme, space, radius, font, type Palette } from "./theme";
 
 const Tab = createBottomTabNavigator();
 
@@ -38,12 +38,17 @@ const TAB_ICONS: Record<string, string> = {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppContent />
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 function AppContent() {
+  const { colors, scheme } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,58 +113,68 @@ function AppContent() {
   }
 
   if (user) {
+    const navTheme = {
+      ...(scheme === "dark" ? DarkTheme : DefaultTheme),
+      colors: {
+        ...(scheme === "dark" ? DarkTheme : DefaultTheme).colors,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.label,
+        border: colors.separator,
+        primary: colors.accent,
+      },
+    };
     return (
       <>
-      <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarActiveTintColor: colors.accent,
-            tabBarInactiveTintColor: colors.tertiary,
-            tabBarStyle: {
-              backgroundColor: colors.surface,
-              borderTopColor: colors.separator,
-              paddingTop: 6,
-            },
-            tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-            tabBarIcon: ({ focused }) => (
-              <Text style={{ fontSize: 17, opacity: focused ? 1 : 0.35 }}>
-                {TAB_ICONS[route.name] ?? "•"}
-              </Text>
-            ),
-            headerStyle: { backgroundColor: colors.surface, shadowColor: "transparent" },
-            headerTitleStyle: { ...font.title3, color: colors.label },
-            headerShadowVisible: false,
-          })}
-        >
-          <Tab.Screen
-            name="Discover"
-            options={{
-              headerRight: () => (
-                <Text style={s.headerLogout} onPress={() => setSettingsOpen(true)}>
-                  Account
+        <NavigationContainer theme={navTheme}>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarActiveTintColor: colors.accent,
+              tabBarInactiveTintColor: colors.tertiary,
+              tabBarStyle: {
+                backgroundColor: colors.surface,
+                borderTopColor: colors.separator,
+                paddingTop: 6,
+              },
+              tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+              tabBarIcon: ({ focused }) => (
+                <Text style={{ fontSize: 17, opacity: focused ? 1 : 0.35 }}>
+                  {TAB_ICONS[route.name] ?? "•"}
                 </Text>
               ),
-            }}
+              headerStyle: { backgroundColor: colors.surface },
+              headerTitleStyle: { ...font.title3, color: colors.label },
+              headerShadowVisible: false,
+            })}
           >
-            {() => <DiscoverScreen user={user} />}
-          </Tab.Screen>
-          <Tab.Screen name="Saved" component={SavedScreen} options={{ headerShown: false }} />
-          {user.role === "admin" && (
             <Tab.Screen
-              name="Admin"
-              component={AdminScreen}
-              options={{ headerShown: false }}
-            />
-          )}
-        </Tab.Navigator>
-      </NavigationContainer>
-      <SettingsModal
-        visible={settingsOpen}
-        email={user.email}
-        onClose={() => setSettingsOpen(false)}
-        onEmailChanged={(u) => setUser(u)}
-        onSignOut={handleLogout}
-      />
+              name="Discover"
+              options={{
+                headerRight: () => (
+                  <Text style={s.headerLogout} onPress={() => setSettingsOpen(true)}>
+                    Account
+                  </Text>
+                ),
+              }}
+            >
+              {() => <DiscoverScreen user={user} />}
+            </Tab.Screen>
+            <Tab.Screen name="Saved" component={SavedScreen} options={{ headerShown: false }} />
+            {user.role === "admin" && (
+              <Tab.Screen
+                name="Admin"
+                component={AdminScreen}
+                options={{ headerShown: false }}
+              />
+            )}
+          </Tab.Navigator>
+        </NavigationContainer>
+        <SettingsModal
+          visible={settingsOpen}
+          email={user.email}
+          onClose={() => setSettingsOpen(false)}
+          onSignOut={handleLogout}
+        />
       </>
     );
   }
@@ -219,35 +234,36 @@ function AppContent() {
   );
 }
 
-const s = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  headerLogout: { ...font.subhead, color: colors.accent, fontWeight: "600", marginRight: space.lg },
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+    headerLogout: { ...font.subhead, color: colors.accent, fontWeight: "600", marginRight: space.lg },
 
-  authContainer: { flex: 1, backgroundColor: colors.background },
-  authInner: { flex: 1, justifyContent: "center", paddingHorizontal: space.xxl, gap: space.xl },
-  brand: { alignItems: "center", marginBottom: space.sm },
-  brandMark: { ...font.largeTitle, color: colors.label },
-  brandTagline: { ...font.subhead, color: colors.secondary, marginTop: space.xs },
+    authContainer: { flex: 1, backgroundColor: colors.background },
+    authInner: { flex: 1, justifyContent: "center", paddingHorizontal: space.xxl, gap: space.xl },
+    brand: { alignItems: "center", marginBottom: space.sm },
+    brandMark: { ...font.largeTitle, color: colors.label },
+    brandTagline: { ...font.subhead, color: colors.secondary, marginTop: space.xs },
 
-  formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    overflow: "hidden",
-  },
-  input: { ...font.body, color: colors.label, paddingHorizontal: space.lg, paddingVertical: 15 },
-  inputDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: space.lg },
+    formCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.separator,
+      overflow: "hidden",
+    },
+    input: { ...font.body, color: colors.label, paddingHorizontal: space.lg, paddingVertical: 15 },
+    inputDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: space.lg },
 
-  primaryBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.md,
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-  primaryBtnText: { ...font.headline, color: colors.inverse },
+    primaryBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: radius.md,
+      paddingVertical: 15,
+      alignItems: "center",
+    },
+    primaryBtnText: { ...font.headline, color: colors.inverse },
 
-  linkBtn: { alignItems: "center", paddingVertical: space.sm },
-  linkText: { ...font.subhead, color: colors.secondary },
-  linkTextStrong: { color: colors.accent, fontWeight: "600" },
-});
+    linkBtn: { alignItems: "center", paddingVertical: space.sm },
+    linkText: { ...font.subhead, color: colors.secondary },
+    linkTextStrong: { color: colors.accent, fontWeight: "600" },
+  });

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
@@ -17,9 +17,8 @@ import { api, type SavedJob, type TrackStatus } from "../lib/api";
 import { OutreachModal } from "../components/OutreachModal";
 import { JobDetailModal } from "../components/JobDetailModal";
 import { Avatar } from "../components/Avatar";
-import { colors, space, radius, font, shadow } from "../theme";
+import { useTheme, space, radius, font, shadow, type Palette } from "../theme";
 
-// Application pipeline stages and their badge styling.
 const STATUS_ORDER: TrackStatus[] = [
   "saved",
   "applied",
@@ -29,16 +28,26 @@ const STATUS_ORDER: TrackStatus[] = [
   "rejected",
 ];
 
-const STATUS_META: Record<TrackStatus, { label: string; bg: string; fg: string }> = {
-  saved: { label: "Saved", bg: colors.background, fg: colors.secondary },
+type StatusMeta = Record<TrackStatus, { label: string; bg: string; fg: string }>;
+
+// Pipeline badge colors, theme-aware.
+const makeStatusMeta = (colors: Palette, scheme: "light" | "dark"): StatusMeta => ({
+  saved: { label: "Saved", bg: colors.surfaceAlt, fg: colors.secondary },
   applied: { label: "Applied", bg: colors.accentSoft, fg: colors.accent },
-  screening: { label: "Screening", bg: colors.warningSoft, fg: "#9A6200" },
-  interview: { label: "Interview", bg: "#EEEDFD", fg: "#5E5CE6" },
+  screening: { label: "Screening", bg: colors.warningSoft, fg: scheme === "dark" ? colors.warning : "#9A6200" },
+  interview:
+    scheme === "dark"
+      ? { label: "Interview", bg: "#211F3A", fg: "#A5A1FF" }
+      : { label: "Interview", bg: "#EEEDFD", fg: "#5E5CE6" },
   accepted: { label: "Accepted", bg: colors.successSoft, fg: colors.success },
   rejected: { label: "Rejected", bg: colors.dangerSoft, fg: colors.danger },
-};
+});
 
 export function SavedScreen() {
+  const { colors, scheme } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const STATUS_META = useMemo(() => makeStatusMeta(colors, scheme), [colors, scheme]);
+
   const [items, setItems] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,7 +79,6 @@ export function SavedScreen() {
   }
 
   function setStatus(jobId: string, status: TrackStatus) {
-    // Optimistic update; reload on failure.
     setItems((prev) => prev.map((j) => (j.id === jobId ? { ...j, trackStatus: status } : j)));
     api.setTrackStatus(jobId, status).catch((err: any) => {
       Alert.alert("Couldn't update status", err.message);
@@ -95,7 +103,6 @@ export function SavedScreen() {
         text: "Remove",
         style: "destructive",
         onPress: async () => {
-          // Optimistic removal.
           setItems((prev) => prev.filter((j) => j.id !== jobId));
           try {
             await api.unsave(jobId);
@@ -144,7 +151,6 @@ export function SavedScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
         renderItem={({ item }) => {
-          // Defensive: fall back to "saved" if the API hasn't been migrated yet.
           const meta = STATUS_META[item.trackStatus] ?? STATUS_META.saved;
           return (
             <Pressable style={s.card} onPress={() => setDetailJobId(item.id)}>
@@ -184,7 +190,6 @@ export function SavedScreen() {
                 onPress={(e) => {
                   e.stopPropagation();
                   Linking.openURL(item.applyUrl);
-                  // First tap on Apply moves the job into the "Applied" stage.
                   if (item.trackStatus === "saved") setStatus(item.id, "applied");
                 }}
               >
@@ -230,40 +235,41 @@ export function SavedScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: space.xxl, backgroundColor: colors.background },
-  emptyEmoji: { fontSize: 44, marginBottom: space.md },
-  list: { paddingHorizontal: space.lg, paddingBottom: space.xxl },
-  headerBlock: { paddingTop: space.sm, paddingBottom: space.lg },
-  header: { ...font.largeTitle, color: colors.label },
-  headerCount: { ...font.subhead, color: colors.secondary, marginTop: 2 },
-  card: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, marginBottom: space.md,
-    ...shadow.card,
-  },
-  cardHeaderRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.md },
-  cardHeaderText: { flex: 1, gap: 1 },
-  cardCompany: { ...font.caption, fontWeight: "700", color: colors.accent, textTransform: "uppercase", letterSpacing: 0.6 },
-  cardRating: { ...font.caption, color: colors.secondary, fontWeight: "600" },
-  cardRatingStar: { color: colors.star },
-  statusBadge: { paddingHorizontal: space.md, paddingVertical: 5, borderRadius: radius.pill },
-  statusBadgeText: { ...font.caption, fontWeight: "700" },
-  cardTitle: { ...font.title3, color: colors.label, marginBottom: space.sm },
-  metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.md, marginBottom: space.md },
-  cardLocation: { ...font.footnote, color: colors.secondary },
-  cardSalary: { ...font.footnote, color: colors.success, fontWeight: "600" },
-  expandHint: { ...font.caption, color: colors.tertiary, marginBottom: space.md },
-  applyButton: { backgroundColor: colors.accent, paddingVertical: 12, borderRadius: radius.sm, alignItems: "center" },
-  applyButtonText: { ...font.subhead, color: colors.inverse, fontWeight: "600" },
-  secondaryRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
-  secondaryBtn: {
-    flex: 1, paddingVertical: 11, borderRadius: radius.sm, alignItems: "center",
-    backgroundColor: colors.accentSoft,
-  },
-  secondaryBtnText: { ...font.footnote, color: colors.accent, fontWeight: "600" },
-  unsaveBtn: { backgroundColor: colors.dangerSoft },
-  unsaveText: { color: colors.danger },
-  emptyTitle: { ...font.title2, color: colors.label, marginBottom: space.xs },
-  emptySubtitle: { ...font.subhead, color: colors.secondary, textAlign: "center", lineHeight: 21 },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, justifyContent: "center", alignItems: "center", padding: space.xxl, backgroundColor: colors.background },
+    emptyEmoji: { fontSize: 44, marginBottom: space.md },
+    list: { paddingHorizontal: space.lg, paddingBottom: space.xxl },
+    headerBlock: { paddingTop: space.sm, paddingBottom: space.lg },
+    header: { ...font.largeTitle, color: colors.label },
+    headerCount: { ...font.subhead, color: colors.secondary, marginTop: 2 },
+    card: {
+      backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, marginBottom: space.md,
+      ...shadow.card,
+    },
+    cardHeaderRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.md },
+    cardHeaderText: { flex: 1, gap: 1 },
+    cardCompany: { ...font.caption, fontWeight: "700", color: colors.accent, textTransform: "uppercase", letterSpacing: 0.6 },
+    cardRating: { ...font.caption, color: colors.secondary, fontWeight: "600" },
+    cardRatingStar: { color: colors.star },
+    statusBadge: { paddingHorizontal: space.md, paddingVertical: 5, borderRadius: radius.pill },
+    statusBadgeText: { ...font.caption, fontWeight: "700" },
+    cardTitle: { ...font.title3, color: colors.label, marginBottom: space.sm },
+    metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.md, marginBottom: space.md },
+    cardLocation: { ...font.footnote, color: colors.secondary },
+    cardSalary: { ...font.footnote, color: colors.success, fontWeight: "600" },
+    expandHint: { ...font.caption, color: colors.tertiary, marginBottom: space.md },
+    applyButton: { backgroundColor: colors.accent, paddingVertical: 12, borderRadius: radius.sm, alignItems: "center" },
+    applyButtonText: { ...font.subhead, color: colors.inverse, fontWeight: "600" },
+    secondaryRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
+    secondaryBtn: {
+      flex: 1, paddingVertical: 11, borderRadius: radius.sm, alignItems: "center",
+      backgroundColor: colors.accentSoft,
+    },
+    secondaryBtnText: { ...font.footnote, color: colors.accent, fontWeight: "600" },
+    unsaveBtn: { backgroundColor: colors.dangerSoft },
+    unsaveText: { color: colors.danger },
+    emptyTitle: { ...font.title2, color: colors.label, marginBottom: space.xs },
+    emptySubtitle: { ...font.subhead, color: colors.secondary, textAlign: "center", lineHeight: 21 },
+  });

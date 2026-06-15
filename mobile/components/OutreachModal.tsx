@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Modal,
   View,
@@ -11,7 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { api, type OutreachDraft } from "../lib/api";
-import { colors, space, radius, font, shadow } from "../theme";
+import { useTheme, space, radius, font, shadow, type Palette } from "../theme";
 
 export function OutreachModal({
   jobId,
@@ -22,6 +22,8 @@ export function OutreachModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [draft, setDraft] = useState<OutreachDraft | null>(null);
   const [loading, setLoading] = useState(false);
   const [subject, setSubject] = useState("");
@@ -139,7 +141,7 @@ export function OutreachModal({
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerRow: {
     flexDirection: "row",

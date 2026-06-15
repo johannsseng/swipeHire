@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import { storageSet, storageGet, storageDelete } from "./storage";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 if (!API_BASE) {
@@ -11,21 +11,21 @@ const ACCESS_KEY = "swipehire_access";
 const REFRESH_KEY = "swipehire_refresh";
 
 export async function setTokens(access: string, refresh: string) {
-  await SecureStore.setItemAsync(ACCESS_KEY, access);
-  await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  await storageSet(ACCESS_KEY, access);
+  await storageSet(REFRESH_KEY, refresh);
 }
 
 export async function getAccessToken() {
-  return SecureStore.getItemAsync(ACCESS_KEY);
+  return storageGet(ACCESS_KEY);
 }
 
 export async function getRefreshToken() {
-  return SecureStore.getItemAsync(REFRESH_KEY);
+  return storageGet(REFRESH_KEY);
 }
 
 export async function clearTokens() {
-  await SecureStore.deleteItemAsync(ACCESS_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await storageDelete(ACCESS_KEY);
+  await storageDelete(REFRESH_KEY);
 }
 
 // Called when refresh fails and the session is truly dead, so the app can

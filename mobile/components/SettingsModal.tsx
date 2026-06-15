@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Modal,
   View,
@@ -9,27 +9,31 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { api, type User } from "../lib/api";
-import { colors, space, radius, font, shadow } from "../theme";
+import { api } from "../lib/api";
+import { useTheme, space, radius, font, shadow, type Palette, type ThemeMode } from "../theme";
+
+const APPEARANCE_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 export function SettingsModal({
   visible,
   email,
   onClose,
-  onEmailChanged,
   onSignOut,
 }: {
   visible: boolean;
   email: string;
   onClose: () => void;
-  onEmailChanged: (user: User) => void;
   onSignOut: () => void | Promise<void>;
 }) {
-  const [newEmail, setNewEmail] = useState("");
-  const [emailPassword, setEmailPassword] = useState("");
+  const { colors, mode, setMode } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
-  const [savingEmail, setSavingEmail] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
   const [resumeText, setResumeText] = useState("");
   const [resumeStatus, setResumeStatus] = useState<string | null>(null);
@@ -37,17 +41,13 @@ export function SettingsModal({
 
   useEffect(() => {
     if (visible) {
-      setNewEmail("");
-      setEmailPassword("");
       setCurrentPw("");
       setNewPw("");
       setResumeText("");
       api
         .getResume()
         .then((r) =>
-          setResumeStatus(
-            r.hasResume ? `Resume on file · ${r.keywordCount} keywords` : null
-          )
+          setResumeStatus(r.hasResume ? `Resume on file · ${r.keywordCount} keywords` : null)
         )
         .catch(() => setResumeStatus(null));
     }
@@ -71,25 +71,6 @@ export function SettingsModal({
       Alert.alert("Couldn't save resume", err.message);
     } finally {
       setSavingResume(false);
-    }
-  }
-
-  async function saveEmail() {
-    if (!newEmail.trim() || !emailPassword) {
-      Alert.alert("Missing info", "Enter your new email and current password.");
-      return;
-    }
-    setSavingEmail(true);
-    try {
-      const res = await api.updateEmail(emailPassword, newEmail.trim());
-      onEmailChanged(res.user);
-      setNewEmail("");
-      setEmailPassword("");
-      Alert.alert("Email updated", "Your email has been changed.");
-    } catch (err: any) {
-      Alert.alert("Couldn't update email", err.message);
-    } finally {
-      setSavingEmail(false);
     }
   }
 
@@ -148,10 +129,30 @@ export function SettingsModal({
           <Text style={s.signedInLabel}>Signed in as</Text>
           <Text style={s.signedInEmail}>{email}</Text>
 
+          {/* Appearance */}
+          <Text style={s.section}>Appearance</Text>
+          <View style={s.segRow}>
+            {APPEARANCE_OPTIONS.map((opt) => {
+              const active = mode === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[s.segItem, active && s.segItemActive]}
+                  onPress={() => setMode(opt.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.segText, active && s.segTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {/* Resume (powers SmartFeed's scanner layer) */}
           <Text style={s.section}>Resume</Text>
           <View style={s.card}>
-            {resumeStatus ? <Text style={s.resumeStatus}>✓ {resumeStatus}</Text> : (
+            {resumeStatus ? (
+              <Text style={s.resumeStatus}>✓ {resumeStatus}</Text>
+            ) : (
               <Text style={s.resumeHint}>
                 Paste your resume and we'll match jobs against it. Your swipes refine it from there.
               </Text>
@@ -172,36 +173,6 @@ export function SettingsModal({
               <Text style={s.primaryBtnText}>
                 {savingResume ? "Scanning…" : resumeStatus ? "Replace resume" : "Scan resume"}
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Email */}
-          <Text style={s.section}>Change email</Text>
-          <View style={s.card}>
-            <TextInput
-              style={s.input}
-              placeholder="New email"
-              placeholderTextColor={colors.tertiary}
-              value={newEmail}
-              onChangeText={setNewEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-            />
-            <TextInput
-              style={s.input}
-              placeholder="Current password"
-              placeholderTextColor={colors.tertiary}
-              value={emailPassword}
-              onChangeText={setEmailPassword}
-              secureTextEntry
-            />
-            <TouchableOpacity
-              style={[s.primaryBtn, savingEmail && s.btnDisabled]}
-              onPress={saveEmail}
-              disabled={savingEmail}
-            >
-              <Text style={s.primaryBtnText}>{savingEmail ? "Updating…" : "Update email"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -246,38 +217,46 @@ export function SettingsModal({
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    paddingHorizontal: space.xl,
-    paddingTop: 56,
-    paddingBottom: space.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  title: { ...font.title3, color: colors.label, flex: 1 },
-  close: { ...font.body, color: colors.accent, fontWeight: "600" },
-  scroll: { padding: space.lg },
-  signedInLabel: { ...font.caption, color: colors.tertiary, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.4 },
-  signedInEmail: { ...font.headline, color: colors.label, marginTop: 2 },
-  section: { ...font.footnote, fontWeight: "600", color: colors.secondary, textTransform: "uppercase", letterSpacing: 0.4, marginTop: space.xxl, marginBottom: space.sm },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, gap: space.sm, ...shadow.card },
-  resumeStatus: { ...font.footnote, color: colors.success, fontWeight: "600" },
-  resumeHint: { ...font.footnote, color: colors.secondary, lineHeight: 18 },
-  resumeInput: { minHeight: 120, textAlignVertical: "top" },
-  input: {
-    backgroundColor: colors.background, borderRadius: radius.sm,
-    paddingHorizontal: space.md, paddingVertical: 12, fontSize: 15, color: colors.label,
-  },
-  primaryBtn: { backgroundColor: colors.accent, paddingVertical: 13, borderRadius: radius.sm, alignItems: "center", marginTop: space.xs },
-  primaryBtnText: { ...font.subhead, color: colors.inverse, fontWeight: "600" },
-  btnDisabled: { opacity: 0.5 },
-  logoutBtn: { backgroundColor: colors.surface, paddingVertical: 14, borderRadius: radius.md, alignItems: "center", marginTop: space.xxl, ...shadow.card },
-  logoutText: { ...font.headline, color: colors.accent },
-  deleteBtn: { paddingVertical: 14, alignItems: "center", marginTop: space.sm },
-  deleteText: { ...font.subhead, color: colors.danger, fontWeight: "600" },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.md,
+      paddingHorizontal: space.xl,
+      paddingTop: 56,
+      paddingBottom: space.md,
+      backgroundColor: colors.surface,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.separator,
+    },
+    title: { ...font.title3, color: colors.label, flex: 1 },
+    close: { ...font.body, color: colors.accent, fontWeight: "600" },
+    scroll: { padding: space.lg },
+    signedInLabel: { ...font.caption, color: colors.tertiary, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.4 },
+    signedInEmail: { ...font.headline, color: colors.label, marginTop: 2 },
+    section: { ...font.footnote, fontWeight: "600", color: colors.secondary, textTransform: "uppercase", letterSpacing: 0.4, marginTop: space.xxl, marginBottom: space.sm },
+    card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, gap: space.sm, ...shadow.card },
+
+    segRow: { flexDirection: "row", backgroundColor: colors.surfaceAlt, borderRadius: radius.sm, padding: 3, gap: 3 },
+    segItem: { flex: 1, paddingVertical: 9, borderRadius: radius.sm - 3, alignItems: "center" },
+    segItemActive: { backgroundColor: colors.accent },
+    segText: { ...font.subhead, color: colors.secondary, fontWeight: "600" },
+    segTextActive: { color: colors.inverse },
+
+    resumeStatus: { ...font.footnote, color: colors.success, fontWeight: "600" },
+    resumeHint: { ...font.footnote, color: colors.secondary, lineHeight: 18 },
+    resumeInput: { minHeight: 120, textAlignVertical: "top" },
+    input: {
+      backgroundColor: colors.surfaceAlt, borderRadius: radius.sm,
+      paddingHorizontal: space.md, paddingVertical: 12, fontSize: 15, color: colors.label,
+    },
+    primaryBtn: { backgroundColor: colors.accent, paddingVertical: 13, borderRadius: radius.sm, alignItems: "center", marginTop: space.xs },
+    primaryBtnText: { ...font.subhead, color: colors.inverse, fontWeight: "600" },
+    btnDisabled: { opacity: 0.5 },
+    logoutBtn: { backgroundColor: colors.surface, paddingVertical: 14, borderRadius: radius.md, alignItems: "center", marginTop: space.xxl, ...shadow.card },
+    logoutText: { ...font.headline, color: colors.accent },
+    deleteBtn: { paddingVertical: 14, alignItems: "center", marginTop: space.sm },
+    deleteText: { ...font.subhead, color: colors.danger, fontWeight: "600" },
+  });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Modal,
   View,
@@ -17,9 +17,10 @@ import RenderHTML from "react-native-render-html";
 import { api, type JobDetail, type ReviewsResponse } from "../lib/api";
 import { OutreachModal } from "./OutreachModal";
 import { Avatar } from "./Avatar";
-import { colors, space, radius, font, shadow } from "../theme";
+import { useTheme, space, radius, font, shadow, type Palette } from "../theme";
 
 function Stars({ value, size = 16 }: { value: number; size?: number }) {
+  const { colors } = useTheme();
   return (
     <Text style={{ fontSize: size, color: colors.star, letterSpacing: 1 }}>
       {"★★★★★".slice(0, value)}
@@ -37,6 +38,9 @@ export function JobDetailModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const htmlTagStyles = useMemo(() => makeHtmlTagStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [reviews, setReviews] = useState<ReviewsResponse | null>(null);
@@ -263,7 +267,7 @@ export function JobDetailModal({
   );
 }
 
-const htmlTagStyles = {
+const makeHtmlTagStyles = (colors: Palette) => ({
   p: { marginBottom: 10, fontSize: 15, lineHeight: 22, color: colors.secondary },
   li: { marginBottom: 6, fontSize: 15, lineHeight: 22, color: colors.secondary },
   strong: { fontWeight: "600" as const, color: colors.label },
@@ -272,9 +276,9 @@ const htmlTagStyles = {
   h2: { fontSize: 16, fontWeight: "700" as const, marginVertical: 8, color: colors.label },
   h3: { fontSize: 15, fontWeight: "700" as const, marginVertical: 6, color: colors.label },
   a: { color: colors.accent },
-};
+});
 
-const s = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerRow: {
     flexDirection: "row",

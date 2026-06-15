@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,15 +14,21 @@ import RenderHTML from "react-native-render-html";
 import { api, type User, type Job } from "../lib/api";
 import { JobDetailModal } from "../components/JobDetailModal";
 import { Avatar } from "../components/Avatar";
-import { colors, space, radius, font, shadow } from "../theme";
+import { useTheme, space, radius, font, shadow, type Palette } from "../theme";
 
 export function DiscoverScreen({ user }: { user: User }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const overlayLabels = useMemo(() => makeOverlayLabels(colors), [colors]);
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [detailJobId, setDetailJobId] = useState<string | null>(null);
+  const [deckKey, setDeckKey] = useState(0);
   const swiperRef = useRef<Swiper<Job>>(null);
   const undoingRef = useRef(false);
   const canUndo = undoCount > 0;
@@ -48,6 +54,24 @@ export function DiscoverScreen({ user }: { user: User }) {
     }
   }
 
+  // Pull a fresh batch of listings from the top and reset the deck.
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const res = await api.getFeed();
+      setJobs(res.items);
+      setCursor(res.nextCursor);
+      setUndoCount(0);
+      setEmpty(res.items.length === 0);
+      setDeckKey((k) => k + 1); // remount the swiper so it starts at the top
+    } catch (err: any) {
+      Alert.alert("Couldn't refresh", err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function handleSwipe(jobIndex: number, direction: "left" | "right") {
     const job = jobs[jobIndex];
     if (!job) return;
@@ -57,8 +81,7 @@ export function DiscoverScreen({ user }: { user: User }) {
     });
   }
 
-  // Swipe up opens the full detail page (description, salary, recruiter,
-  // reviews), then restores the card so it isn't discarded.
+  // Swipe up opens the full detail page, then restores the card.
   function handleSwipedTop(jobIndex: number) {
     const job = jobs[jobIndex];
     swiperRef.current?.swipeBack();
@@ -66,7 +89,6 @@ export function DiscoverScreen({ user }: { user: User }) {
   }
 
   async function handleUndo() {
-    // Step back one card at a time; stays available while there's history.
     if (undoCount === 0 || undoingRef.current) return;
     undoingRef.current = true;
     swiperRef.current?.swipeBack();
@@ -76,7 +98,6 @@ export function DiscoverScreen({ user }: { user: User }) {
     } catch (err: any) {
       console.warn("Undo failed:", err.message);
     }
-    // Brief lockout so a fast double-tap can't outrun the swipe-back animation.
     setTimeout(() => {
       undoingRef.current = false;
     }, 350);
@@ -96,6 +117,9 @@ export function DiscoverScreen({ user }: { user: User }) {
         <Text style={s.emptyEmoji}>🎉</Text>
         <Text style={s.emptyTitle}>You're all caught up</Text>
         <Text style={s.emptySubtitle}>Check back later for fresh roles.</Text>
+        <TouchableOpacity style={s.emptyRefresh} onPress={handleRefresh} disabled={refreshing}>
+          <Text style={s.emptyRefreshText}>{refreshing ? "Refreshing…" : "↻ Refresh listings"}</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -104,19 +128,29 @@ export function DiscoverScreen({ user }: { user: User }) {
     <SafeAreaView style={s.deckContainer} edges={["left", "right", "bottom"]}>
       <View style={s.topBar}>
         <TouchableOpacity
-          style={[s.undoBtn, !canUndo && s.undoBtnDisabled]}
+          style={[s.pillBtn, !canUndo && s.pillBtnDisabled]}
           onPress={handleUndo}
           disabled={!canUndo}
           hitSlop={8}
         >
-          <Text style={[s.undoText, !canUndo && s.undoTextDisabled]}>
+          <Text style={[s.pillText, !canUndo && s.pillTextDisabled]}>
             ↺ Undo{undoCount > 1 ? ` (${undoCount})` : ""}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.pillBtn, refreshing && s.pillBtnDisabled]}
+          onPress={handleRefresh}
+          disabled={refreshing}
+          hitSlop={8}
+        >
+          <Text style={s.pillText}>{refreshing ? "↻ …" : "↻ Refresh"}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={s.deck}>
         <Swiper
+          key={deckKey}
           ref={swiperRef}
           cards={jobs}
           renderCard={(job) =>
@@ -145,7 +179,6 @@ export function DiscoverScreen({ user }: { user: User }) {
         />
       </View>
 
-
       <JobDetailModal
         jobId={detailJobId}
         visible={detailJobId !== null}
@@ -156,6 +189,9 @@ export function DiscoverScreen({ user }: { user: User }) {
 }
 
 function JobCard({ job, onDetails }: { job: Job; onDetails: () => void }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const htmlTagStyles = useMemo(() => makeHtmlTagStyles(colors), [colors]);
   const { width } = useWindowDimensions();
 
   return (
@@ -205,7 +241,7 @@ function JobCard({ job, onDetails }: { job: Job; onDetails: () => void }) {
   );
 }
 
-// Tinder-style stamps that fade in as you drag the card.
+// Tinder-style stamps that fade in as you drag the card (scheme-independent bg).
 const stampBase = {
   fontSize: 30,
   fontWeight: "800" as const,
@@ -214,10 +250,10 @@ const stampBase = {
   paddingHorizontal: 14,
   paddingVertical: 4,
   overflow: "hidden" as const,
-  backgroundColor: "rgba(255,255,255,0.9)",
+  backgroundColor: "rgba(255,255,255,0.92)",
 };
 
-const overlayLabels = {
+const makeOverlayLabels = (colors: Palette) => ({
   left: {
     title: "PASS",
     style: {
@@ -255,9 +291,9 @@ const overlayLabels = {
       },
     },
   },
-};
+});
 
-const htmlTagStyles = {
+const makeHtmlTagStyles = (colors: Palette) => ({
   p: { marginBottom: 8, fontSize: 15, lineHeight: 22, color: colors.secondary },
   li: { marginBottom: 4, fontSize: 15, lineHeight: 22, color: colors.secondary },
   strong: { fontWeight: "600" as const, color: colors.label },
@@ -267,65 +303,67 @@ const htmlTagStyles = {
   h3: { fontSize: 14, fontWeight: "700" as const, marginVertical: 4, color: colors.label },
   a: { color: colors.accent },
   div: { marginBottom: 4 },
-};
-
-const s = StyleSheet.create({
-  deckContainer: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, padding: space.xxl },
-  emptyEmoji: { fontSize: 44, marginBottom: space.md },
-  emptyTitle: { ...font.title2, color: colors.label, marginBottom: space.xs },
-  emptySubtitle: { ...font.subhead, color: colors.secondary, textAlign: "center" },
-
-  deck: { flex: 1 },
-  card: {
-    height: "86%",
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    padding: space.xxl,
-    ...shadow.card,
-  },
-  cardHeaderRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.lg },
-  cardHeaderText: { flex: 1, gap: 2 },
-  cardCompany: {
-    ...font.footnote,
-    fontWeight: "700",
-    color: colors.accent,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  cardRating: { ...font.footnote, color: colors.secondary, fontWeight: "600" },
-  cardRatingStar: { color: colors.star },
-  cardTitle: { ...font.title1, color: colors.label, marginBottom: space.md },
-  cardMetaRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginBottom: space.lg },
-  cardLocation: { ...font.subhead, color: colors.secondary },
-  remotePill: { backgroundColor: colors.successSoft, paddingHorizontal: space.md, paddingVertical: 3, borderRadius: radius.pill },
-  remotePillText: { ...font.caption, fontWeight: "600", color: colors.success },
-  descriptionContainer: { flex: 1, overflow: "hidden" },
-  cardDescription: { ...font.subhead, color: colors.secondary, lineHeight: 22 },
-  fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 48 },
-  actionBtn: {
-    backgroundColor: colors.accentSoft,
-    paddingVertical: 13,
-    borderRadius: radius.md,
-    alignItems: "center",
-    marginTop: space.lg,
-  },
-  actionBtnText: { ...font.subhead, color: colors.accent, fontWeight: "600" },
-  cardHint: { ...font.caption, color: colors.tertiary, textAlign: "center", marginTop: space.md },
-
-  topBar: {
-    // Floating overlay so it doesn't push the card deck down.
-    position: "absolute", top: space.sm, left: space.lg, zIndex: 10,
-    flexDirection: "row", alignItems: "center",
-  },
-  undoBtn: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: colors.surface,
-    paddingHorizontal: space.lg, paddingVertical: space.sm,
-    borderRadius: radius.pill,
-    ...shadow.floating,
-  },
-  undoBtnDisabled: { opacity: 0.35 },
-  undoText: { ...font.subhead, fontWeight: "700", color: colors.accent },
-  undoTextDisabled: { color: colors.tertiary },
 });
+
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    deckContainer: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, padding: space.xxl },
+    emptyEmoji: { fontSize: 44, marginBottom: space.md },
+    emptyTitle: { ...font.title2, color: colors.label, marginBottom: space.xs },
+    emptySubtitle: { ...font.subhead, color: colors.secondary, textAlign: "center" },
+    emptyRefresh: { marginTop: space.xl, backgroundColor: colors.accentSoft, paddingHorizontal: space.xl, paddingVertical: space.md, borderRadius: radius.pill },
+    emptyRefreshText: { ...font.subhead, color: colors.accent, fontWeight: "600" },
+
+    deck: { flex: 1 },
+    card: {
+      height: "86%",
+      borderRadius: radius.xl,
+      backgroundColor: colors.surface,
+      padding: space.xxl,
+      ...shadow.card,
+    },
+    cardHeaderRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.lg },
+    cardHeaderText: { flex: 1, gap: 2 },
+    cardCompany: {
+      ...font.footnote,
+      fontWeight: "700",
+      color: colors.accent,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+    },
+    cardRating: { ...font.footnote, color: colors.secondary, fontWeight: "600" },
+    cardRatingStar: { color: colors.star },
+    cardTitle: { ...font.title1, color: colors.label, marginBottom: space.md },
+    cardMetaRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginBottom: space.lg },
+    cardLocation: { ...font.subhead, color: colors.secondary },
+    remotePill: { backgroundColor: colors.successSoft, paddingHorizontal: space.md, paddingVertical: 3, borderRadius: radius.pill },
+    remotePillText: { ...font.caption, fontWeight: "600", color: colors.success },
+    descriptionContainer: { flex: 1, overflow: "hidden" },
+    cardDescription: { ...font.subhead, color: colors.secondary, lineHeight: 22 },
+    fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 48 },
+    actionBtn: {
+      backgroundColor: colors.accentSoft,
+      paddingVertical: 13,
+      borderRadius: radius.md,
+      alignItems: "center",
+      marginTop: space.lg,
+    },
+    actionBtnText: { ...font.subhead, color: colors.accent, fontWeight: "600" },
+    cardHint: { ...font.caption, color: colors.tertiary, textAlign: "center", marginTop: space.md },
+
+    topBar: {
+      position: "absolute", top: space.sm, left: space.lg, right: space.lg, zIndex: 10,
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    },
+    pillBtn: {
+      flexDirection: "row", alignItems: "center",
+      backgroundColor: colors.surface,
+      paddingHorizontal: space.lg, paddingVertical: space.sm,
+      borderRadius: radius.pill,
+      ...shadow.floating,
+    },
+    pillBtnDisabled: { opacity: 0.35 },
+    pillText: { ...font.subhead, fontWeight: "700", color: colors.accent },
+    pillTextDisabled: { color: colors.tertiary },
+  });

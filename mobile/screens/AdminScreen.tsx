@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
@@ -15,9 +15,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, type AdminCompany } from "../lib/api";
-import { colors, space, radius, font, shadow } from "../theme";
+import { useTheme, space, radius, font, shadow, type Palette } from "../theme";
 
 export function AdminScreen() {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [items, setItems] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,6 +115,8 @@ function EditModal({
   onClose: () => void;
   onSaved: (c: AdminCompany) => void;
 }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [website, setWebsite] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
@@ -218,7 +222,7 @@ function normalizeUrl(input: string): string {
   return /^https?:\/\//.test(input) ? input : `https://${input}`;
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors: Palette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   header: { ...font.largeTitle, color: colors.label, paddingHorizontal: space.xl, paddingTop: space.lg },

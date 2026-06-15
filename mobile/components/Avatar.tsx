@@ -1,5 +1,5 @@
 import { View, Text, Image, StyleSheet } from "react-native";
-import { colors } from "../theme";
+import { useTheme } from "../theme";
 
 // Company avatar: shows the real logo when we have one, otherwise a clean
 // monogram circle with a deterministic color derived from the company name.
@@ -30,13 +30,14 @@ export function Avatar({
   logoUrl?: string | null;
   size?: number;
 }) {
+  const { colors } = useTheme();
   const radius = size * 0.28;
 
   if (logoUrl) {
     return (
       <Image
         source={{ uri: logoUrl }}
-        style={[s.logo, { width: size, height: size, borderRadius: radius }]}
+        style={{ width: size, height: size, borderRadius: radius, backgroundColor: colors.surface }}
       />
     );
   }
@@ -56,7 +57,6 @@ export function Avatar({
 }
 
 const s = StyleSheet.create({
-  logo: { backgroundColor: colors.surface },
   monogram: { alignItems: "center", justifyContent: "center" },
   initial: { color: "#fff", fontWeight: "700" },
 });
