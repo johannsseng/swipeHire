@@ -9,10 +9,12 @@
     "sync:reviews": "tsx --env-file=../.env src/reviews.ts",
     "sync:jsearch": "tsx --env-file=../.env src/jsearch.ts",
     "enrich:domains": "tsx --env-file=../.env src/domains.ts",
+    "prune": "tsx --env-file=../.env src/prune.ts",
     "sync:prod": "tsx src/sync.ts",
     "reviews:prod": "tsx src/reviews.ts",
     "jsearch:prod": "tsx src/jsearch.ts",
     "domains:prod": "tsx src/domains.ts",
+    "prune:prod": "tsx src/prune.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

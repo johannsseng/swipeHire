@@ -65,6 +65,7 @@ pnpm --filter @swipehire/worker sync       # sync Greenhouse + Lever job boards
 pnpm --filter @swipehire/worker sync:reviews   # sync Glassdoor reviews (needs RAPIDAPI_KEY)
 pnpm --filter @swipehire/worker sync:jsearch   # aggregated jobs via JSearch (needs RAPIDAPI_KEY)
 pnpm --filter @swipehire/worker enrich:domains # backfill company websites/logos (free, no key)
+pnpm --filter @swipehire/worker prune          # retire stale/old listings (run after sync)
 ```
 
 To use the **Admin** tab in the app, promote your user: `UPDATE users SET role='admin' WHERE email='you@example.com';`

@@ -61,7 +61,7 @@ services:
 #    branch: main
 #    schedule: "0 6 * * *" # daily, 06:00 UTC
 #    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @swipehire/api prisma:generate
-#    startCommand: pnpm --filter @swipehire/worker sync:prod && pnpm --filter @swipehire/worker domains:prod
+#    startCommand: pnpm --filter @swipehire/worker sync:prod && pnpm --filter @swipehire/worker domains:prod && pnpm --filter @swipehire/worker prune:prod
 #    envVars:
 #      - fromGroup: swipehire
 #
