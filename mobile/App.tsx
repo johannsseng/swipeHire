@@ -26,6 +26,7 @@ import { SavedScreen } from "./screens/SavedScreen";
 import { AdminScreen } from "./screens/AdminScreen";
 import { SettingsModal } from "./components/SettingsModal";
 import { ThemeProvider, useTheme, space, radius, font, type Palette } from "./theme";
+import SearchScreen  from "./screens/SearchScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -33,6 +34,7 @@ const TAB_ICONS: Record<string, string> = {
   Discover: "🧭",
   Saved: "🔖",
   Admin: "⚙️",
+  Search: "🔍",
 };
 
 export default function App() {
@@ -159,6 +161,13 @@ function AppContent() {
             >
               {() => <DiscoverScreen user={user} />}
             </Tab.Screen>
+
+            <Tab.Screen
+              name="Search"
+              component={SearchScreen}
+              options={{ headerShown: false }}
+              />
+           
             <Tab.Screen name="Saved" component={SavedScreen} options={{ headerShown: false }} />
             {user.role === "admin" && (
               <Tab.Screen

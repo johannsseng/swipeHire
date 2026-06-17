@@ -71,6 +71,7 @@ export function DiscoverScreen({ user }: { user: User }) {
       setRefreshing(false);
     }
   }
+ 
 
   function handleSwipe(jobIndex: number, direction: "left" | "right") {
     const job = jobs[jobIndex];
@@ -146,6 +147,7 @@ export function DiscoverScreen({ user }: { user: User }) {
         >
           <Text style={s.pillText}>{refreshing ? "↻ …" : "↻ Refresh"}</Text>
         </TouchableOpacity>
+
       </View>
 
       <View style={s.deck}>
